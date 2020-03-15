@@ -10,7 +10,7 @@ import static model.Group.MONEY_ZERO;
 @AllArgsConstructor
 public class Debt implements Comparable<Debt> {
     private Money amount;
-    private final String participant;
+    private final String debtor;
 
     public void setZeroAmount() {
         this.amount = MONEY_ZERO;
@@ -18,7 +18,7 @@ public class Debt implements Comparable<Debt> {
 
     @Override
     public String toString() {
-        return participant + ", " + amount;
+        return debtor + ", " + amount;
     }
 
     @Override

@@ -2,7 +2,6 @@ package model;
 
 import exception.UserExistsException;
 import exception.UserNotFoundException;
-import lombok.Value;
 import org.joda.money.CurrencyUnit;
 import org.joda.money.Money;
 
@@ -18,11 +17,10 @@ import java.util.stream.Collectors;
 import static java.lang.String.format;
 import static model.User.MAX_DEBT_COMPARATOR;
 
-@Value
 public class Group {
 
     static final Money MONEY_ZERO = Money.zero(CurrencyUnit.USD);
-    Map<String, User> userMap = new HashMap<>();
+    private final Map<String, User> userMap = new HashMap<>();
 
     public void addUser(String userName) throws UserExistsException {
         boolean userExists = userMap.containsKey(userName);
@@ -31,6 +29,10 @@ public class Group {
             throw new UserExistsException(format("User %s already exists", userName));
         }
         userMap.put(userName, new User(userName));
+    }
+
+    public List<User> getUsers() {
+        return new ArrayList<>(userMap.values());
     }
 
     public void addDebt(Money amount, String debtorName, String creditorName) throws UserNotFoundException {
@@ -53,25 +55,25 @@ public class Group {
 
     private void removeDebtsWithAmountZero() {
         Predicate<Debt> isGreaterThanZero = debt -> !debt.getAmount().isGreaterThan(MONEY_ZERO);
-        getUsers().forEach(u -> u.getBorrowedFrom().removeIf(isGreaterThanZero));
+        getUsers().forEach(u -> u.getDebts().removeIf(isGreaterThanZero));
     }
 
     private void calculateDebts(User creditor, User debtor, Money amount) {
-        Optional<Debt> existingDebtorDebt = debtor.getBorrowedFromByName(creditor.getName());
+        Optional<Debt> existingDebtorDebt = debtor.getDebtByCreditorName(creditor.getName());
 
         if (existingDebtorDebt.isPresent()) {
             existingDebtorDebt
                     .ifPresent(d -> d.setAmount(d.getAmount().plus(amount)));
         } else {
-            debtor.addBorrowedFrom(new Debt(amount, creditor.getName()));
+            debtor.addDebt(new Debt(amount, creditor.getName()));
         }
 
         calculateDebtsForNewDebt(creditor, debtor);
     }
 
     private void calculateDebtsForNewDebt(User creditor, User debtor) {
-        Optional<Debt> existingDebtorDebt = debtor.getBorrowedFromByName(creditor.getName());
-        Optional<Debt> existingCreditorDebt = creditor.getBorrowedFromByName(debtor.getName());
+        Optional<Debt> existingDebtorDebt = debtor.getDebtByCreditorName(creditor.getName());
+        Optional<Debt> existingCreditorDebt = creditor.getDebtByCreditorName(debtor.getName());
 
         if (existingDebtorDebt.isPresent() && existingCreditorDebt.isPresent()) {
             Debt borrowed = existingDebtorDebt.get();
@@ -96,7 +98,7 @@ public class Group {
 
     private User findUserWithTheBiggestDebt() {
         return userMap.values().stream()
-                .filter(u -> !u.getBorrowedFrom().isEmpty())
+                .filter(user -> !user.getDebts().isEmpty())
                 .max(MAX_DEBT_COMPARATOR)
                 .orElse(null);
     }
@@ -106,9 +108,9 @@ public class Group {
         if (maxDebtUser == null) {
             return;
         }
-        Debt maxDebt = Collections.max(maxDebtUser.getBorrowedFrom());
+        Debt maxDebt = Collections.max(maxDebtUser.getDebts());
         Optional<User> maxDebtorOfMaxDebtUser = getUsers().stream()
-                .filter(u -> u.getBorrowedFromByName(maxDebtUser.getName()).isPresent())
+                .filter(u -> u.getDebtByCreditorName(maxDebtUser.getName()).isPresent())
                 .filter(u -> !u.getName().equals(maxDebtUser.getName()))
                 .max(MAX_DEBT_COMPARATOR);
 
@@ -116,21 +118,13 @@ public class Group {
             return;
         }
 
-        Optional<Debt> creditorForMaxDebt = maxDebtorOfMaxDebtUser.get().getBorrowedFromByName(maxDebtUser.getName());
+        Optional<Debt> creditorForMaxDebt = maxDebtorOfMaxDebtUser.get().getDebtByCreditorName(maxDebtUser.getName());
 
         if (!creditorForMaxDebt.isPresent()) {
             return;
         }
-
-        transferDebtToSimplify(maxDebtorOfMaxDebtUser.get(), maxDebt, creditorForMaxDebt.get());
-    }
-
-    private void transferDebtToSimplify(User maxDebtorOfMaxDebtUser, Debt maxDebt, Debt creditorForMaxDebt) {
-        Money maxDebtsDifference = maxDebt.getAmount().minus(creditorForMaxDebt.getAmount());
-
-        maxDebtorOfMaxDebtUser.addBorrowedFrom(new Debt(creditorForMaxDebt.getAmount(), maxDebt.getParticipant()));
-        creditorForMaxDebt.setZeroAmount();
-        maxDebt.setAmount(maxDebtsDifference);
+        Debt debtToBeTransferred = new Debt(creditorForMaxDebt.get().getAmount(), maxDebt.getDebtor());
+        transferDebtToOtherUser(maxDebtorOfMaxDebtUser.get(), maxDebt, creditorForMaxDebt.get(), debtToBeTransferred);
     }
 
     private void transferDebtsForIndirectConnections() {
@@ -139,15 +133,15 @@ public class Group {
         if (maxDebtUser == null) {
             return;
         }
-        Debt maxDebt = Collections.max(maxDebtUser.getBorrowedFrom());
+        Debt maxDebt = Collections.max(maxDebtUser.getDebts());
 
         if (maxDebt == null || maxDebt.getAmount().equals(MONEY_ZERO)) {
             return;
         }
 
-        final String creditorForTheBiggestDebt = maxDebt.getParticipant();
+        final String creditorForTheBiggestDebt = maxDebt.getDebtor();
 
-        List<Debt> debtsOfCreditor = userMap.get(creditorForTheBiggestDebt).getBorrowedFrom();
+        List<Debt> debtsOfCreditor = userMap.get(creditorForTheBiggestDebt).getDebts();
 
         if (debtsOfCreditor.isEmpty()) {
             return;
@@ -162,18 +156,16 @@ public class Group {
         if (maxDebtsDifference.isLessThan(MONEY_ZERO)) {
             return;
         }
-
-        transferDebtToOtherUser(maxDebtUser, maxDebt, maxDebtOfCreditor, maxDebtsDifference);
+        Debt debtToBeTransferred = new Debt(maxDebtOfCreditor.getAmount(), maxDebtOfCreditor.getDebtor());
+        transferDebtToOtherUser(maxDebtUser, maxDebt, maxDebtOfCreditor, debtToBeTransferred);
     }
 
-    private void transferDebtToOtherUser(User userTransferTo, Debt debtTransferTo, Debt debtTransferFrom, Money newDebtAmount) {
-        userTransferTo.addBorrowedFrom(new Debt(debtTransferFrom.getAmount(), debtTransferFrom.getParticipant()));
+    private void transferDebtToOtherUser(User userTransferTo, Debt debtTransferTo, Debt debtTransferFrom, Debt debtToBeTransferred) {
+        Money newDebtAmount = debtTransferTo.getAmount().minus(debtTransferFrom.getAmount());
+
+        userTransferTo.addDebt(debtToBeTransferred);
         debtTransferFrom.setZeroAmount();
         debtTransferTo.setAmount(newDebtAmount);
-    }
-
-    public List<User> getUsers() {
-        return new ArrayList<>(userMap.values());
     }
 
     private String printUsers() {

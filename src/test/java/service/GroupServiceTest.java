@@ -33,7 +33,7 @@ public class GroupServiceTest {
         //given
         Group homeGroup = new Group();
 
-        Money expectedMoney = Money.of(CurrencyUnit.USD, 200);
+        Money expectedMoney = getMoney(200);
         List<Debt> expectedDebts = singletonList(new Debt(expectedMoney, USER_BEN));
 
         User expectedBen = new User(USER_BEN, emptyList());
@@ -45,7 +45,7 @@ public class GroupServiceTest {
         homeGroup.addUser(USER_JOHN);
 
         homeGroup.addDebt(MONEY_1000_USD, USER_BEN, USER_JOHN);
-        homeGroup.addDebt(Money.of(CurrencyUnit.USD, 1200), USER_JOHN, USER_BEN);
+        homeGroup.addDebt(getMoney(1200), USER_JOHN, USER_BEN);
         List<User> actual = homeGroup.getUsers();
 
         //then
@@ -119,7 +119,7 @@ public class GroupServiceTest {
         Group homeGroup = new Group();
 
         List<Debt> mikeExpectedDebts = singletonList(new Debt(MONEY_120_USD, USER_BEN));
-        List<Debt> johnExpectedDebts = singletonList(new Debt(Money.of(CurrencyUnit.USD, 80), USER_BEN));
+        List<Debt> johnExpectedDebts = singletonList(new Debt(getMoney(80), USER_BEN));
 
         User expectedBen = new User(USER_BEN, emptyList());
         User expectedJohn = new User(USER_JOHN, johnExpectedDebts);
@@ -137,8 +137,7 @@ public class GroupServiceTest {
         homeGroup.addDebt(MONEY_120_USD, USER_JOHN, USER_BEN); //john ben 20
         homeGroup.addDebt(MONEY_120_USD, USER_MIKE, USER_BEN); //mike ben 120, john ben 20
         homeGroup.addDebt(MONEY_140_USD, USER_BEN, USER_JOHN); //mike ben 120, ben john 120 -> mike john 120
-        homeGroup.addDebt(Money.of(CurrencyUnit.USD, 200), USER_JOHN, USER_BEN);
-        //mike john 120, john ben 200 -> mike ben 120, john ben 80
+        homeGroup.addDebt(getMoney(200), USER_JOHN, USER_BEN); //mike john 120, john ben 200 -> mike ben 120, john ben 80
 
         List<User> actual = homeGroup.getUsers();
 
@@ -185,7 +184,7 @@ public class GroupServiceTest {
         homeGroup.addUser(USER_MIKE);
         homeGroup.addUser(USER_JOHN);
 
-        Money expectedMoney = Money.of(CurrencyUnit.USD, 20);
+        Money expectedMoney = getMoney(20);
         List<Debt> expectedDebts = singletonList(new Debt(expectedMoney, USER_JOHN));
         User expectedBen = new User(USER_BEN, expectedDebts);
         User expectedMike = new User(USER_MIKE, emptyList());
@@ -204,5 +203,9 @@ public class GroupServiceTest {
 
         //then
         assertThat(actual).isEqualTo(expected);
+    }
+
+    private Money getMoney(int amount) {
+        return Money.of(CurrencyUnit.USD, amount);
     }
 }
