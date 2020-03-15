@@ -1,0 +1,12 @@
+.project
+.classpath
+.settings
+.springBeans
+.pmd
+.ruleset
+atlassian-ide-plugin.xml
+target/
+overlays/
+.idea/
+*.iws
+.idea_modules/
