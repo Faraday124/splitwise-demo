@@ -11,3 +11,4 @@ overlays/
 *.iws
 .iml
 .idea_modules/
+/splitwise-demo.iml
