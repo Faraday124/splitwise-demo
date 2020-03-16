@@ -4,6 +4,7 @@ TODO:
 * refactor
 * move methods from Group (model) to GroupService - currently it's a draft
 * add tests (more complex scenarios + performance tests + edge cases)
+* make Debt class immutable - improve in terms of concurrency
 * simple GUI (i.e. React)
 * persist data (i.e. MongoDB)
 * add Spring and use RestControllers 
